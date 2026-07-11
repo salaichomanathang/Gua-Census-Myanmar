@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gua Census</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Firebase SDK (Database ချိတ်ဆက်ရန်) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Remove arrows from number inputs */
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        .error-shake { animation: shake 0.5s; border-color: #ef4444; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCUX9wToj8hrXkDkIUuUYhDNJCMy5TnzNA",
+            authDomain: "gua-census-malaysia.firebaseapp.com",
+            projectId: "gua-census-malaysia",
+            storageBucket: "gua-census-malaysia.firebasestorage.app",
+            messagingSenderId: "885704694794",
+            appId: "1:885704694794:web:c30ff18c9f7796bd97d3f3"
+        };
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
+        const Eye = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
+        const EyeOff = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>;
+        const Users = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+        const CheckCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>;
+        const AlertCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>;
+        const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>;
+        const LogOut = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>;
+
+        const LOCATIONS = {
+          "(1) Kant tha-yung (ကန့်သာရုံအုပ်စု)": [
+            "(1.1.1) Kantthayung (ကန့်သာရုံရွာ)", "(1.2.2) Solong (ဆော်လောင်းရွာ)", "(1.3.3) Yelongpang (ရယ်လောင်းပန်းရွာ)", 
+            "(1.4.4) Kanlong (ကန်းလောင်းရွာ)", "(1.5.5) Paikon (ပါကွင်းရွာ)", "(1.6.6) Lungmong (လုန်မောင်ရွာ)", "(1.7.7) 6 Miles (၆မိုင်ရွာ)"
+          ],
+          "(2) Ngonglong (ငုံလောင်းအုပ်စု)": [
+            "(2.1.8) Ngonglong (ငုံလောင်းရွာ)", "(2.2.9) Anpum (အမ်ပုံရွာ)", "(2.3.10) Kyodo (ကျို့တော်ရွာ)", 
+            "(2.4.11) Apyeng (အပြိုင်းရွာ)", "(2.5.12) Cho lakmän (ချင်းလက်မွန်ရွာ)"
+          ],
+          "(3) Khido (ခိတော်အုပ်စု)": [
+            "(3.1.13) Khido (ခိတော်ရွာ)", "(3.2.14) Cangm'cai (စမ္မသားရွာ)", "(3.3.15) Cang-imnu (စံအိမ်နူးရွာ)", 
+            "(3.4.16) M'Citui (မစိတွီရွာ)", "(3.5.17) Khuabang (ခါပန်းရွာ)"
+          ],
+          "(4) M'Kya (မကြား အုပ်စု)": [
+            "(4.1.18) M'Kya (မကြားရွာ)", "(4.2.19) Sekcung (ဆဲစုမ်ရွာ)", "(4.3.20) Lungbok (လုံဘောက်ရွာ)", 
+            "(4.4.21) Pakkyang (ပတ်ကြံရွာ)", "(4.5.22) M'Dilong (မဒီလောင်းရွာ)", "(4.6.23) Kyawktong (ကျောက်တောင်ရွာ)", "(4.7.24) Thang-om (ထန်းအွမ်းရွာ)"
+          ],
+          "(5) Tungnge (တုံငယ် အုပ်စု)": [
+            "(5.1.25) Tungnge (တုံငယ်ရွာ)", "(5.2.26) Hlalongpang (လှလောင်းပန်းရွာ)"
+          ]
+        };
+
+        const INITIAL_FORM = {
+          group: '', village: '', name: '', gender: '', age: '', job: '', 
+          isStudent: '', studentClass: '', studentSchool: '',
+          outKanpetlet: '', outKMale: '', outKFemale: '', outKPlace: '',
+          abroad: '', abroadMale: '', abroadFemale: '', abroadCountry: '',
+          remark: ''
+        };
+
+        function App() {
+          const [view, setView] = useState('form'); 
+          const [formData, setFormData] = useState(INITIAL_FORM);
+          const [errors, setErrors] = useState({});
+          const [submitting, setSubmitting] = useState(false);
+          const [showSuccessModal, setShowSuccessModal] = useState(false);
+          const [myDocId, setMyDocId] = useState(null);
+          const [errorMessage, setErrorMessage] = useState("");
+          
+          const [adminIdInput, setAdminIdInput] = useState('');
+          const [adminPassInput, setAdminPassInput] = useState('');
+          const [showPassword, setShowPassword] = useState(false);
+          
+          const [allData, setAllData] = useState([]);
+          const [filterGroup, setFilterGroup] = useState('');
+          const [filterVillage, setFilterVillage] = useState('');
+          
+          const [showSettings, setShowSettings] = useState(false);
+          const [newAdminId, setNewAdminId] = useState('');
+          const [newAdminPass, setNewAdminPass] = useState('');
+          const [showNewPassword, setShowNewPassword] = useState(false);
+
+          useEffect(() => {
+            if (!localStorage.getItem('adminId_domestic')) {
+              localStorage.setItem('adminId_domestic', 'admin');
+              localStorage.setItem('adminPass_domestic', 'census123');
+            }
+
+            const savedSession = localStorage.getItem('census_domestic_submission_v3');
+            if (savedSession) {
+              const parsed = JSON.parse(savedSession);
+              const now = new Date().getTime();
+              if (now - parsed.timestamp < 86400000) { 
+                setMyDocId(parsed.id);
+                fetchMyData(parsed.id);
+              } else {
+                localStorage.removeItem('census_domestic_submission_v3'); 
+              }
+            }
+          }, [view]);
+
+          const fetchMyData = async (id) => {
+            try {
+                const docRef = await db.collection('census_data_domestic').doc(id).get();
+                if (docRef.exists) {
+                    setFormData(docRef.data());
+                }
+            } catch (error) {
+                console.error("Fetch Data Error:", error);
+            }
+          };
+
+          const handleInputChange = (e) => {
+            const { name, value } = e.target;
+            
+            if ((name === 'age' || name === 'outKMale' || name === 'outKFemale' || name === 'abroadMale' || name === 'abroadFemale') && /[^0-9]/.test(value)) {
+              return; 
+            }
+
+            setFormData(prev => {
+              const newData = { ...prev, [name]: value };
+              if (name === 'group') newData.village = '';
+              if (name === 'isStudent' && value === 'no') {
+                newData.studentClass = ''; newData.studentSchool = '';
+              }
+              if (name === 'outKanpetlet' && value === 'no') {
+                newData.outKMale = ''; newData.outKFemale = ''; newData.outKPlace = '';
+              }
+              if (name === 'abroad' && value === 'no') {
+                newData.abroadMale = ''; newData.abroadFemale = ''; newData.abroadCountry = '';
+              }
+              return newData;
+            });
+            
+            if (errors[name]) {
+              setErrors(prev => ({ ...prev, [name]: null }));
+            }
+          };
+
+          const validateForm = () => {
+            const newErrors = {};
+            if (!formData.group) newErrors.group = true;
+            if (!formData.village) newErrors.village = true;
+            if (!formData.name) newErrors.name = true;
+            if (!formData.gender) newErrors.gender = true;
+            if (!formData.age) newErrors.age = true;
+            if (!formData.job) newErrors.job = true;
+            
+            if (formData.isStudent === 'yes') {
+               if (!formData.studentClass) newErrors.studentClass = true;
+               if (!formData.studentSchool) newErrors.studentSchool = true;
+            } else if (!formData.isStudent) {
+               newErrors.isStudent = true;
+            }
+
+            if (formData.outKanpetlet === 'yes') {
+               if (!formData.outKMale && !formData.outKFemale) newErrors.outKMale = true;
+               if (!formData.outKPlace) newErrors.outKPlace = true;
+            } else if (!formData.outKanpetlet) {
+               newErrors.outKanpetlet = true;
+            }
+
+            if (formData.abroad === 'yes') {
+               if (!formData.abroadMale && !formData.abroadFemale) newErrors.abroadMale = true;
+               if (!formData.abroadCountry) newErrors.abroadCountry = true;
+            } else if (!formData.abroad) {
+               newErrors.abroad = true;
+            }
+
+            setErrors(newErrors);
+            if (Object.keys(newErrors).length > 0) {
+               setErrorMessage("ကျေးဇူးပြု၍ အနီရောင်ဖြင့် ပြထားသော လိုအပ်သည့် အချက်အလက်များကို အပြည့်အစုံ ဖြည့်စွက်ပေးပါ။");
+               window.scrollTo({ top: 0, behavior: 'smooth' });
+               return false;
+            }
+            setErrorMessage("");
+            return true;
+          };
+
+          const handleSubmit = async (e) => {
+            e.preventDefault();
+            if (!validateForm()) return;
+            setSubmitting(true);
+
+            try {
+              const submitData = { ...formData, submittedAt: new Date().toISOString() };
+              
+              if (myDocId) {
+                await db.collection('census_data_domestic').doc(myDocId).update(submitData);
+              } else {
+                const docRef = await db.collection('census_data_domestic').add(submitData);
+                submitData.id = docRef.id;
+                setMyDocId(docRef.id);
+                localStorage.setItem('census_domestic_submission_v3', JSON.stringify({
+                  id: docRef.id,
+                  timestamp: new Date().getTime()
+                }));
+              }
+              
+              setSubmitting(false);
+              setShowSuccessModal(true);
+            } catch (error) {
+              console.error("Save Data Error:", error);
+              setErrorMessage("ချို့ယွင်းချက်ဖြစ်ပေါ်နေပါသည်။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်မံကြိုးစားပါ။");
+              setSubmitting(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          };
+
+          const handleAdminLogin = (e) => {
+            e.preventDefault();
+            const storedId = localStorage.getItem('adminId_domestic');
+            const storedPass = localStorage.getItem('adminPass_domestic');
+
+            if (adminIdInput === storedId && adminPassInput === storedPass) {
+              setView('adminDash');
+              fetchAdminData();
+            } else {
+              setErrorMessage("ID သို့မဟုတ် စကားဝှက် မှားယွင်းနေပါသည်။");
+              setTimeout(() => setErrorMessage(""), 3000);
+            }
+          };
+
+          const handleChangeCredentials = (e) => {
+            e.preventDefault();
+            if (!newAdminId || !newAdminPass) return;
+            
+            localStorage.setItem('adminId_domestic', newAdminId);
+            localStorage.setItem('adminPass_domestic', newAdminPass);
+            
+            setShowSettings(false);
+            setNewAdminId('');
+            setNewAdminPass('');
+            setShowNewPassword(false);
+            
+            setAdminIdInput('');
+            setAdminPassInput('');
+            setView('adminAuth');
+            
+            setErrorMessage("ID နှင့် Password အသစ် ပြောင်းလဲပြီးပါပြီ။ ကျေးဇူးပြု၍ အသစ်ဖြင့် ပြန်လည်ဝင်ရောက်ပါ။");
+            setTimeout(() => setErrorMessage(""), 5000);
+          };
+
+          const fetchAdminData = async () => {
+            try {
+                const snapshot = await db.collection('census_data_domestic').get();
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setAllData(data);
+            } catch (error) {
+                console.error("Admin Fetch Error:", error);
+            }
+          };
+
+          const stats = useMemo(() => {
+            let filtered = allData;
+            if (filterGroup) filtered = filtered.filter(d => d.group === filterGroup);
+            let villageFiltered = filtered;
+            if (filterVillage) villageFiltered = villageFiltered.filter(d => d.village === filterVillage);
+
+            const calculateStats = (dataset) => {
+               const s = {
+                 total: dataset.length,
+                 m: 0, f: 0,
+                 u5_total: 0, u5_m: 0, u5_f: 0,
+                 mid_total: 0, mid_m: 0, mid_f: 0, 
+                 adult_total: 0, adult_m: 0, adult_f: 0, 
+                 old_total: 0, old_m: 0, old_f: 0 
+               };
+
+               dataset.forEach(d => {
+                 const age = parseInt(d.age) || 0;
+                 const isM = d.gender === 'male';
+                 const isF = d.gender === 'female';
+
+                 if (isM) s.m++;
+                 if (isF) s.f++;
+
+                 if (age < 5) {
+                    s.u5_total++; if (isM) s.u5_m++; if (isF) s.u5_f++;
+                 } else if (age >= 5 && age <= 18) {
+                    s.mid_total++; if (isM) s.mid_m++; if (isF) s.mid_f++;
+                 } else if (age > 18 && age <= 60) {
+                    s.adult_total++; if (isM) s.adult_m++; if (isF) s.adult_f++;
+                 } else if (age > 60) {
+                    s.old_total++; if (isM) s.old_m++; if (isF) s.old_f++;
+                 }
+               });
+               return s;
+            };
+
+            const gStats = calculateStats(filtered); 
+            const vStats = calculateStats(villageFiltered); 
+
+            const calcPct = (part, total) => total > 0 ? ((part / total) * 100).toFixed(1) + '%' : '0%';
+
+            return { group: gStats, village: vStats, calcPct };
+          }, [allData, filterGroup, filterVillage]);
+
+          const renderForm = () => (
+            <div className="max-w-3xl mx-auto p-3 sm:p-4 pb-24 relative fade-in">
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-800 p-6 sm:p-8 text-white text-center">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold mb-3 tracking-wide leading-snug">
+                    ရာ့ လူဦးရေစာရင်းကောက်ခံခြင်း ဖောင် (အစမ်း)
+                  </h1>
+                  
+                  <div className="bg-yellow-400 text-yellow-900 px-4 py-2 rounded-xl text-sm font-bold shadow-sm inline-block mb-4">
+                    အချက်လက် ဖြည့်မှားပါက ၂၄ နာရီအတွင်းသာ ပြန်လည်ပြင်ဆင်ခွင့်ရှိပါမည်။ ၂၄ နာရီကျော်လျှင် admin ကသာ ပြင်ရပါမည်။
+                  </div>
+
+                  <div className="text-sm sm:text-base text-emerald-50 text-left bg-black/20 p-4 rounded-xl leading-relaxed">
+                    ကန်ပက်လက်မြို့နယ် တိုက်နယ်အမှတ် (၅) ရာ့လူဦးရေစာရင်းလေးကောက်ခံနိုင်မဲ့ app လေးဖြစ်ပါတယ်။ ဒီမှာပေးထားတဲ့ ဖောင်လေးကိုအသေချာဖတ်ပြီးမှန်မှန်ကန်ကန်ဖြေဆိုပေးကြပါ။ လွယ်လွယ်လေးပါ။ ဖြေဆိုချိန်က ၅ မိနစ်မကြာပါဘူး。<br/><br/>
+                    ဒါဖြေဆိုလို့ ကော ဘာရမလဲ။ ဘာမှတော့ မရပါဘူးဗျာ။ ဒါဆို ဘာ အကျိုးရှိမလဲ။ အကျိုးကတော့ အများကြီးရှိပါတယ်၊ ကျေးရွာတစ်ရွာ ဒေသတစ်ခု ရဲ့ လူဦးရေစာရင်းဟာအရေးကြီးပါတယ်။ မိမိတို့ တိုက်နယ် /အုပ်စု/ကျေးရွာလူဦးရေစာရင်းပြန်သိရတော့မကောင်းဘူးလား။ ဒီလို လူဦးရေ စာရင်းသိရတော့ အခြားကိစ္စတွေလည်း အလွယ်တကူစဉ်းစားလို့ ရတာပေါ့၊ ဒီစာရင်းကောက်ခံတာက ဘာသာရေး၊ နိုင်ငံရေး ဘာနှင့်မှ ဆက်စပ်တာတော့ မဟုတ်ပါဘူး။ မိမိတို့ ဒေသလူဦးရေစာရင်းသိရဘို့ အတွက် စာရင်းလေးကောက်ခံလို့ရတဲ့ app လေးကို ကောက်ဆွဲလိုက်ခြင်းသာဖြစ်ပါတယ်။<br/><br/>
+                    ဒါကြောင့် တိုက်နယ် အမှတ်(၅)မှာတာဝန်ရှိတဲ့ သူတွေက မိမိတို့ အုပ်စု ကျေးရွာမှာ ရှိတဲ့ လူဦးရေ စာရင်းလေးကို ဝိုင်းဝန်းကြိုးစားပြီးကောက်ခံပေးကြစေလိုပါတယ်။
+                  </div>
+                </div>
+                
+                <form onSubmit={handleSubmit} className="p-4 sm:p-8 space-y-6">
+                  
+                  {errorMessage && (
+                    <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded shadow-sm flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                      <p className="font-bold">{errorMessage}</p>
+                    </div>
+                  )}
+
+                  <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-100">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">(၁) အုပ်စု ရွေးချယ်ပါ <span className="text-red-500">*</span></label>
+                    <select name="group" value={formData.group} onChange={handleInputChange} className={`w-full p-4 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none mb-4 bg-white transition ${errors.group ? 'error-shake' : 'border-slate-300'}`}>
+                      <option value="">မိမိအုပ်စုနာမည် ရွေးချယ်ပါ</option>
+                      {Object.keys(LOCATIONS).map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                    {errors.group && <p className="text-red-500 text-xs mt-1 font-bold">အုပ်စု ရွေးချယ်ရန် လိုအပ်ပါသည်</p>}
+
+                    {formData.group && (
+                      <div className="fade-in">
+                        <label className="block text-sm font-bold text-slate-700 mb-2">(၂) ကျေးရွာ ရွေးချယ်ပါ <span className="text-red-500">*</span></label>
+                        <select name="village" value={formData.village} onChange={handleInputChange} className={`w-full p-4 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white transition ${errors.village ? 'error-shake' : 'border-slate-300'}`}>
+                          <option value="">မိမိကျေးရွာနာမည် ရွေးချယ်ပါ</option>
+                          {LOCATIONS[formData.group].map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                        {errors.village && <p className="text-red-500 text-xs mt-1 font-bold">ကျေးရွာ ရွေးချယ်ရန် လိုအပ်ပါသည်</p>}
+                      </div>
+                    )}
+                  </div>
+
+                  {formData.village && (
+                    <div className="space-y-6 fade-in">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                        {/* (၃) အမည် */}
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-bold text-slate-700 mb-2">(၃) မိမိအမည် <span className="text-red-500">*</span></label>
+                          <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="အမည်ထည့်ပါ (English - Myanmar ၂ ဘာသာဖြင့် ရေးနိုင်ပါသည်)" className={`w-full p-4 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white transition ${errors.name ? 'error-shake' : 'border-slate-300'}`} />
+                          {errors.name && <p className="text-red-500 text-xs mt-1 font-bold">အမည် ဖြည့်ရန် လိုအပ်ပါသည်</p>}
+                        </div>
+                        
+                        {/* (၄) ကျား/မ */}
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">(၄) ကျား/မ <span className="text-red-500">*</span></label>
+                          <select name="gender" value={formData.gender} onChange={handleInputChange} className={`w-full p-4 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white transition ${errors.gender ? 'error-shake' : 'border-slate-300'}`}>
+                            <option value="">- ရွေးရန် -</option>
+                            <option value="male">ကျား</option>
+                            <option value="female">မ</option>
+                          </select>
+                          {errors.gender && <p className="text-red-500 text-xs mt-1 font-bold">ကျား/မ ရွေးချယ်ရန် လိုအပ်ပါသည်</p>}
+                        </div>
+
+                        {/* (၅) အလုပ်အကိုင် */}
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">(၅) အလုပ်အကိုင် <span className="text-red-500">*</span></label>
+                          <input type="text" name="job" value={formData.job} onChange={handleInputChange} placeholder="အလုပ်အကိုင် ဖြည့်ပါ" className={`w-full p-4 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white transition ${errors.job ? 'error-shake' : 'border-slate-300'}`} />
+                          {errors.job && <p className="text-red-500 text-xs mt-1 font-bold">အလုပ်အကိုင် ဖြည့်ရန် လိုအပ်ပါသည်</p>}
+                        </div>
+
+                        {/* (၆) အသက် */}
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-bold text-slate-700 mb-2">(၆) အသက် <span className="text-slate-500 text-xs font-normal">(မွေးရက်မမှတ်မိပါက အနီးစပ်ဆုံးအသက်)</span> <span className="text-red-500">*</span></label>
+                          <input type="tel" inputMode="numeric" pattern="[0-9]*" name="age" value={formData.age} onChange={handleInputChange} placeholder="English ဂဏန်းသာ" maxLength="3" className={`w-full p-4 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white transition ${errors.age ? 'error-shake' : 'border-slate-300'}`} />
+                          {errors.age && <p className="text-red-500 text-xs mt-1 font-bold">အသက် ဖြည့်ရန် လိုအပ်ပါသည်</p>}
+                        </div>
+                      </div>
+
+                      {/* (၇) ကျောင်းသား */}
+                      <div className={`bg-blue-50 p-5 rounded-xl border transition ${errors.isStudent ? 'border-red-400 error-shake' : 'border-blue-200'}`}>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-800 mb-3">(၇) ကျောင်းသား ဟုတ်/မဟုတ် <span className="text-red-500">*</span></label>
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-3 border rounded-lg hover:bg-blue-100 transition shadow-sm flex-1 sm:flex-none">
+                              <input type="radio" name="isStudent" value="yes" checked={formData.isStudent === 'yes'} onChange={handleInputChange} className="w-5 h-5 text-emerald-600" />
+                              <span className="font-bold text-sm">ဟုတ်ပါသည်</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-3 border rounded-lg hover:bg-blue-100 transition shadow-sm flex-1 sm:flex-none">
+                              <input type="radio" name="isStudent" value="no" checked={formData.isStudent === 'no'} onChange={handleInputChange} className="w-5 h-5 text-emerald-600" />
+                              <span className="font-bold text-sm">မဟုတ်ပါ</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {formData.isStudent === 'yes' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5 p-4 bg-white rounded-lg border border-blue-300 fade-in">
+                            <div>
+                              <label className="block text-sm font-bold text-slate-700 mb-2">နောက်ဆုံး သင်ယူခဲ့သော အတန်း <span className="text-red-500">*</span></label>
+                              <input type="text" name="studentClass" value={formData.studentClass} onChange={handleInputChange} className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none ${errors.studentClass ? 'error-shake' : 'border-slate-300'}`} placeholder="အတန်း ရေးပါ" />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-bold text-slate-700 mb-2">ကျောင်းအမည် <span className="text-red-500">*</span></label>
+                              <input type="text" name="studentSchool" value={formData.studentSchool} onChange={handleInputChange} className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none ${errors.studentSchool ? 'error-shake' : 'border-slate-300'}`} placeholder="ကျောင်းအမည် ရေးပါ" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* (၈) ကန်ပက်လက် ပြင်ပ */}
+                      <div className={`bg-amber-50 p-5 rounded-xl border transition ${errors.outKanpetlet ? 'border-red-400 error-shake' : 'border-amber-200'}`}>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-800 mb-3">(၈) မိမိသားသမီး ကန်ပက်လက်ပြင်ပ သွားရောက်ခြင်း ရှိ/မရှိ <span className="text-red-500">*</span></label>
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-3 border rounded-lg hover:bg-amber-100 transition shadow-sm flex-1 sm:flex-none">
+                              <input type="radio" name="outKanpetlet" value="yes" checked={formData.outKanpetlet === 'yes'} onChange={handleInputChange} className="w-5 h-5 text-emerald-600" />
+                              <span className="font-bold text-sm">ရှိပါသည်</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-3 border rounded-lg hover:bg-amber-100 transition shadow-sm flex-1 sm:flex-none">
+                              <input type="radio" name="outKanpetlet" value="no" checked={formData.outKanpetlet === 'no'} onChange={handleInputChange} className="w-5 h-5 text-emerald-600" />
+                              <span className="font-bold text-sm">မရှိပါ</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {formData.outKanpetlet === 'yes' && (
+                          <div className="mt-5 p-4 bg-white rounded-lg border border-amber-300 fade-in space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                              <div className="flex-1">
+                                <label className="block text-sm font-bold text-slate-700 mb-2">ကျား (အရေအတွက်) <span className="text-red-500">*</span></label>
+                                <input type="tel" inputMode="numeric" pattern="[0-9]*" name="outKMale" value={formData.outKMale} onChange={handleInputChange} className={`w-full p-3 border rounded-lg focus:ring-2 outline-none ${errors.outKMale ? 'error-shake' : 'border-slate-300'}`} placeholder="English ဂဏန်းသာ" />
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-sm font-bold text-slate-700 mb-2">မ (အရေအတွက်) <span className="text-red-500">*</span></label>
+                                <input type="tel" inputMode="numeric" pattern="[0-9]*" name="outKFemale" value={formData.outKFemale} onChange={handleInputChange} className="w-full p-3 border rounded-lg focus:ring-2 outline-none border-slate-300" placeholder="English ဂဏန်းသာ" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-bold text-slate-700 mb-2">သွားရောက်သော နေရာ (ဥပမာ - ရန်ကုန်) <span className="text-red-500">*</span></label>
+                              <input type="text" name="outKPlace" value={formData.outKPlace} onChange={handleInputChange} className={`w-full p-3 border rounded-lg focus:ring-2 outline-none ${errors.outKPlace ? 'error-shake' : 'border-slate-300'}`} placeholder="နေရာ ရေးပါ" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* (၉) ပြည်ပ */}
+                      <div className={`bg-purple-50 p-5 rounded-xl border transition ${errors.abroad ? 'border-red-400 error-shake' : 'border-purple-200'}`}>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-800 mb-3">(၉) မိမိသားသမီး ပြည်ပသို့ သွားရောက်သူ ရှိ/မရှိ <span className="text-red-500">*</span></label>
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-3 border rounded-lg hover:bg-purple-100 transition shadow-sm flex-1 sm:flex-none">
+                              <input type="radio" name="abroad" value="yes" checked={formData.abroad === 'yes'} onChange={handleInputChange} className="w-5 h-5 text-emerald-600" />
+                              <span className="font-bold text-sm">ရှိပါသည်</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-3 border rounded-lg hover:bg-purple-100 transition shadow-sm flex-1 sm:flex-none">
+                              <input type="radio" name="abroad" value="no" checked={formData.abroad === 'no'} onChange={handleInputChange} className="w-5 h-5 text-emerald-600" />
+                              <span className="font-bold text-sm">မရှိပါ</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {formData.abroad === 'yes' && (
+                          <div className="mt-5 p-4 bg-white rounded-lg border border-purple-300 fade-in space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                              <div className="flex-1">
+                                <label className="block text-sm font-bold text-slate-700 mb-2">ကျား (အရေအတွက်) <span className="text-red-500">*</span></label>
+                                <input type="tel" inputMode="numeric" pattern="[0-9]*" name="abroadMale" value={formData.abroadMale} onChange={handleInputChange} className={`w-full p-3 border rounded-lg focus:ring-2 outline-none ${errors.abroadMale ? 'error-shake' : 'border-slate-300'}`} placeholder="English ဂဏန်းသာ" />
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-sm font-bold text-slate-700 mb-2">မ (အရေအတွက်) <span className="text-red-500">*</span></label>
+                                <input type="tel" inputMode="numeric" pattern="[0-9]*" name="abroadFemale" value={formData.abroadFemale} onChange={handleInputChange} className="w-full p-3 border rounded-lg focus:ring-2 outline-none border-slate-300" placeholder="English ဂဏန်းသာ" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-bold text-slate-700 mb-2">သွားရောက်သော နိုင်ငံ (ဥပမာ - မလေးရှား) <span className="text-red-500">*</span></label>
+                              <input type="text" name="abroadCountry" value={formData.abroadCountry} onChange={handleInputChange} className={`w-full p-3 border rounded-lg focus:ring-2 outline-none ${errors.abroadCountry ? 'error-shake' : 'border-slate-300'}`} placeholder="နိုင်ငံ ရေးပါ" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* (၁၀) မှတ်ချက် */}
+                      <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                        <label className="block text-sm font-bold text-slate-700 mb-2">(၁၀) မှတ်ချက်</label>
+                        <textarea name="remark" value={formData.remark} onChange={handleInputChange} rows="2" placeholder="(တစ်ခုခု ပြောကြားလိုသည်များ ရှိပါကရေးသားနိုင်ပါသည်)" className="w-full p-3 sm:p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white resize-none"></textarea>
+                      </div>
+
+                      <button type="submit" disabled={submitting} className="w-full bg-emerald-600 text-white text-lg font-bold py-4 rounded-xl shadow-xl hover:bg-emerald-700 disabled:opacity-50 transition transform active:scale-95 flex justify-center items-center gap-2">
+                        {submitting ? 'ပေးပို့နေပါသည်...' : (myDocId ? 'ပြင်ဆင်မည်' : 'စာရင်းသွင်းမည်')}
+                      </button>
+                    </div>
+                  )}
+                </form>
+              </div>
+              <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6">
+                <button type="button" onClick={() => setView('adminAuth')} className="text-sm font-bold text-slate-500 hover:text-slate-800 transition underline flex items-center gap-1">
+                  <SettingsIcon /> Admin ဝင်ရောက်ရန်
+                </button>
+              </div>
+            </div>
+          );
+
+          const renderSuccessModal = () => (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 fade-in">
+              <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center border-t-8 border-emerald-500">
+                <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-emerald-100 mb-6 text-emerald-600">
+                  <CheckCircle />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">အောင်မြင်ပါသည်</h3>
+                <p className="text-gray-600 mb-6 leading-relaxed font-medium">လူဦးရေစာရင်း အချက်အလက်များကို အောင်မြင်စွာ လက်ခံရရှိပြီးပါပြီ။ ကျေးဇူးတင်ပါသည်။</p>
+                <button onClick={() => {setShowSuccessModal(false); setFormData(INITIAL_FORM); setMyDocId(null); window.scrollTo(0,0);}} className="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-emerald-700 transition">
+                  အိုကေ
+                </button>
+              </div>
+            </div>
+          );
+
+          const renderAdminAuth = () => (
+            <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 fade-in">
+              <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm relative">
+                <div className="flex justify-center mb-4 text-emerald-600">
+                  <Users />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">Admin Login</h2>
+                
+                {errorMessage && (
+                  <div className="bg-red-100 text-red-700 p-3 rounded-lg text-sm font-bold mb-4 text-center">
+                    {errorMessage}
+                  </div>
+                )}
+
+                <form onSubmit={handleAdminLogin}>
+                  <input type="text" value={adminIdInput} onChange={(e) => setAdminIdInput(e.target.value)} placeholder="ID" required className="w-full p-4 mb-4 border border-gray-300 rounded-xl text-center focus:ring-2 focus:ring-emerald-500 outline-none font-bold" />
+                  <div className="relative mb-6">
+                    <input type={showPassword ? "text" : "password"} value={adminPassInput} onChange={(e) => setAdminPassInput(e.target.value)} placeholder="Password" required className="w-full p-4 border border-gray-300 rounded-xl text-center focus:ring-2 focus:ring-emerald-500 outline-none font-bold pr-12" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showPassword ? <EyeOff /> : <Eye />}
+                    </button>
+                  </div>
+                  <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl hover:bg-emerald-700 transition mb-4">ဝင်မည်</button>
+                  <button type="button" onClick={() => {setView('form'); setAdminPassInput(''); setAdminIdInput('');}} className="w-full text-gray-500 font-bold hover:text-gray-800 transition">Form သို့ ပြန်သွားမည်</button>
+                </form>
+              </div>
+            </div>
+          );
+
+          const renderAdminDash = () => {
+             const gs = stats.group;
+             const vs = stats.village;
+
+             const TableRow = ({ label, total, m, f, pctTotal, pctM, pctF }) => (
+               <tr className="border-b hover:bg-slate-50 transition">
+                 <td className="p-3 font-bold text-slate-700 border-r">{label}</td>
+                 <td className="p-3 text-center bg-blue-50/50">{total} <span className="text-xs text-blue-600 ml-1">({pctTotal})</span></td>
+                 <td className="p-3 text-center bg-indigo-50/50">{m} <span className="text-xs text-indigo-600 ml-1">({pctM})</span></td>
+                 <td className="p-3 text-center bg-pink-50/50">{f} <span className="text-xs text-pink-600 ml-1">({pctF})</span></td>
+               </tr>
+             );
+
+             return (
+              <div className="max-w-7xl mx-auto p-4 md:p-6 pb-20 fade-in">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                  <h1 className="text-2xl font-bold text-emerald-800 flex items-center gap-2">
+                    <Users /> Admin Dashboard
+                  </h1>
+                  <div className="flex flex-wrap gap-3">
+                    <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-800 font-bold rounded-lg hover:bg-slate-200 transition">
+                      <SettingsIcon /> ID/Pass ပြောင်းရန်
+                    </button>
+                    <button onClick={() => {setView('form'); setAdminPassInput(''); setAdminIdInput('');}} className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200">
+                      <LogOut /> ထွက်မည်
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50 p-5 rounded-xl shadow-sm border border-emerald-200 mb-6">
+                  <h2 className="text-lg font-bold text-emerald-900 mb-4">Filter (ရွေးချယ်ကြည့်ရှုရန်)</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <select value={filterGroup} onChange={(e) => {setFilterGroup(e.target.value); setFilterVillage('');}} className="w-full p-3 border border-emerald-300 rounded-lg outline-none font-bold">
+                      <option value="">အုပ်စု အားလုံး (All Groups)</option>
+                      {Object.keys(LOCATIONS).map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                    <select value={filterVillage} onChange={(e) => setFilterVillage(e.target.value)} disabled={!filterGroup} className="w-full p-3 border border-emerald-300 rounded-lg outline-none disabled:bg-slate-200 font-bold">
+                      <option value="">ရွာအားလုံး (All Villages)</option>
+                      {filterGroup && LOCATIONS[filterGroup].map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Village Stats Table */}
+                {filterVillage && (
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                    <div className="bg-indigo-600 text-white p-4 font-bold text-lg">ကျေးရွာ လူဦးရေစာရင်း အကျဉ်းချုပ်</div>
+                    <div className="overflow-x-auto no-scrollbar">
+                      <table className="w-full text-left whitespace-nowrap">
+                        <thead className="bg-slate-100 text-slate-700 text-sm border-b">
+                          <tr>
+                            <th className="p-3 font-bold border-r">အသက်အရွယ်</th>
+                            <th className="p-3 font-bold text-center">စုစုပေါင်း (ရာခိုင်နှုန်း)</th>
+                            <th className="p-3 font-bold text-center">ကျား (ရာခိုင်နှုန်း)</th>
+                            <th className="p-3 font-bold text-center">မ (ရာခိုင်နှုန်း)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-sm">
+                          <TableRow label="၅ နှစ်အောက်" total={vs.u5_total} m={vs.u5_m} f={vs.u5_f} pctTotal={stats.calcPct(vs.u5_total, vs.total)} pctM={stats.calcPct(vs.u5_m, vs.total)} pctF={stats.calcPct(vs.u5_f, vs.total)} />
+                          <TableRow label="၅ နှစ်မှ ၁၈ နှစ်ကြား" total={vs.mid_total} m={vs.mid_m} f={vs.mid_f} pctTotal={stats.calcPct(vs.mid_total, vs.total)} pctM={stats.calcPct(vs.mid_m, vs.total)} pctF={stats.calcPct(vs.mid_f, vs.total)} />
+                          <TableRow label="၁၈ နှစ်မှ ၆၀ ကြား" total={vs.adult_total} m={vs.adult_m} f={vs.adult_f} pctTotal={stats.calcPct(vs.adult_total, vs.total)} pctM={stats.calcPct(vs.adult_m, vs.total)} pctF={stats.calcPct(vs.adult_f, vs.total)} />
+                          <TableRow label="၆၀ နှစ်နှင့် အထက်" total={vs.old_total} m={vs.old_m} f={vs.old_f} pctTotal={stats.calcPct(vs.old_total, vs.total)} pctM={stats.calcPct(vs.old_m, vs.total)} pctF={stats.calcPct(vs.old_f, vs.total)} />
+                          <tr className="border-t-2 border-slate-300 bg-slate-50">
+                            <td className="p-3 font-extrabold text-slate-800 border-r">ကျေးရွာ စုစုပေါင်း</td>
+                            <td className="p-3 font-extrabold text-center text-blue-700">{vs.total} <span className="text-xs ml-1">(100%)</span></td>
+                            <td className="p-3 font-extrabold text-center text-indigo-700">{vs.m} <span className="text-xs ml-1">({stats.calcPct(vs.m, vs.total)})</span></td>
+                            <td className="p-3 font-extrabold text-center text-pink-700">{vs.f} <span className="text-xs ml-1">({stats.calcPct(vs.f, vs.total)})</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Group Stats Table */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="bg-emerald-700 text-white p-4 font-bold text-lg">အုပ်စု လူဦးရေစာရင်း အကျဉ်းချုပ် {filterGroup ? `(${filterGroup.split('(')[0]})` : '(အားလုံး)'}</div>
+                  <div className="overflow-x-auto no-scrollbar">
+                    <table className="w-full text-left whitespace-nowrap">
+                      <thead className="bg-slate-100 text-slate-700 text-sm border-b">
+                        <tr>
+                          <th className="p-3 font-bold border-r">အသက်အရွယ်</th>
+                          <th className="p-3 font-bold text-center">စုစုပေါင်း (ရာခိုင်နှုန်း)</th>
+                          <th className="p-3 font-bold text-center">ကျား (ရာခိုင်နှုန်း)</th>
+                          <th className="p-3 font-bold text-center">မ (ရာခိုင်နှုန်း)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm">
+                        <TableRow label="၅ နှစ်အောက်" total={gs.u5_total} m={gs.u5_m} f={gs.u5_f} pctTotal={stats.calcPct(gs.u5_total, gs.total)} pctM={stats.calcPct(gs.u5_m, gs.total)} pctF={stats.calcPct(gs.u5_f, gs.total)} />
+                        <TableRow label="၅ နှစ်မှ ၁၈ နှစ်ကြား" total={gs.mid_total} m={gs.mid_m} f={gs.mid_f} pctTotal={stats.calcPct(gs.mid_total, gs.total)} pctM={stats.calcPct(gs.mid_m, gs.total)} pctF={stats.calcPct(gs.mid_f, gs.total)} />
+                        <TableRow label="၁၈ နှစ်မှ ၆၀ ကြား" total={gs.adult_total} m={gs.adult_m} f={gs.adult_f} pctTotal={stats.calcPct(gs.adult_total, gs.total)} pctM={stats.calcPct(gs.adult_m, gs.total)} pctF={stats.calcPct(gs.adult_f, gs.total)} />
+                        <TableRow label="၆၀ နှစ်နှင့် အထက်" total={gs.old_total} m={gs.old_m} f={gs.old_f} pctTotal={stats.calcPct(gs.old_total, gs.total)} pctM={stats.calcPct(gs.old_m, gs.total)} pctF={stats.calcPct(gs.old_f, gs.total)} />
+                        <tr className="border-t-2 border-slate-300 bg-slate-50">
+                          <td className="p-3 font-extrabold text-slate-800 border-r">အုပ်စု စုစုပေါင်း</td>
+                          <td className="p-3 font-extrabold text-center text-blue-700">{gs.total} <span className="text-xs ml-1">(100%)</span></td>
+                          <td className="p-3 font-extrabold text-center text-indigo-700">{gs.m} <span className="text-xs ml-1">({stats.calcPct(gs.m, gs.total)})</span></td>
+                          <td className="p-3 font-extrabold text-center text-pink-700">{gs.f} <span className="text-xs ml-1">({stats.calcPct(gs.f, gs.total)})</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Settings Modal (Password Change) */}
+                {showSettings && (
+                  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 fade-in">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative">
+                      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">ID / Password ပြောင်းရန်</h2>
+                      <form onSubmit={handleChangeCredentials} className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold mb-1">Admin ID အသစ်</label>
+                          <input type="text" value={newAdminId} onChange={(e) => setNewAdminId(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 outline-none font-bold" required />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-1">Password အသစ်</label>
+                          <div className="relative">
+                            <input type={showNewPassword ? "text" : "password"} value={newAdminPass} onChange={(e) => setNewAdminPass(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 outline-none pr-10 font-bold" required />
+                            <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                              {showNewPassword ? <EyeOff /> : <Eye />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+                          <button type="button" onClick={() => setShowSettings(false)} className="px-4 py-2 bg-slate-200 rounded-lg font-bold hover:bg-slate-300">Cancel</button>
+                          <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700">Change</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+              </div>
+             );
+          };
+
+          return (
+            <div className="min-h-screen bg-slate-100 text-slate-800 font-sans selection:bg-emerald-200 selection:text-emerald-900">
+              {showSuccessModal && renderSuccessModal()}
+              {view === 'form' && renderForm()}
+              {view === 'adminAuth' && renderAdminAuth()}
+              {view === 'adminDash' && renderAdminDash()}
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
